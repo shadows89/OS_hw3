@@ -25,78 +25,77 @@ struct linked_list_t {
 
 typedef struct args_t {
 	linked_list_t** list;
-	op_t op;
+	op_t* op;
 } args_t;
 
-void init_all(node_t* node) {
+node_t* node_init(node_t* previous,node_t* next,int index,void* data) {
+   	node_t* node = (node_t*)malloc(sizeof(node_t));
+	if(node==NULL){
+	   return NULL;
+	}
 	node->rwlock_next = rwlock_init();
 	node->rwlock_prev = rwlock_init();
 	node->rwlock_data = rwlock_init();
 	node->rwlock_index = rwlock_init();
+	node->previous = previous;
+	node->next = next;
+	node->index = index;
+	node->data = data;
+	return node;
 }
 
-void delete_all(node_t* node) {
+void node_destroy(node_t* node) {
 	rwlock_destroy(node->rwlock_next);
 	rwlock_destroy(node->rwlock_prev);
 	rwlock_destroy(node->rwlock_data);
 	rwlock_destroy(node->rwlock_index);
+	free(node);
 }
 
 linked_list_t** list_alloc() {
-
-	linked_list_t** head = malloc(sizeof(*head));
-	if (!head) {
+	linked_list_t** list = malloc(sizeof(*list));
+	if (!list) {
 		return NULL;
 	}
 
-	*head = malloc(sizeof(**head));
-	(*head)->rwlock_head = rwlock_init();
-	(*head)->rwlock_size = rwlock_init();
-	if (!*head) {
+	*list = malloc(sizeof(**list));
+	if(*list==NULL){
+	   free(list);
+	   return NULL;
+	}
+	(*list)->rwlock_head = rwlock_init();
+	(*list)->rwlock_size = rwlock_init();
+	if (!*list) {
 		return NULL;
 	}
-	node_t* node = malloc(sizeof(node_t));
-	if (!node) {
-		return NULL;
-	}
-	(*head)->size = 0;
-	(*head)->head = node;
+	(*list)->size = 0;
+	(*list)->head = node_init(NULL,NULL,-1,NULL);
 
-	node->data = NULL;
-	node->index = -1;
-	node->next = NULL;
-	node->previous = NULL;
-
-	init_all(node);
-
-	return head;
+	return list;
 }
 
 void list_free(linked_list_t*** list) {
-	if(list == NULL){
+	if(list == NULL || *list == NULL || **list==NULL){
 		return;
 	}
-	if (*list == NULL) {
-		return;
-	}
-	node_t* current = (**list)->head;
 	node_t* tmp;
-
+	write_lock((**list)->rwlock_head);
+	node_t* current = (**list)->head;
 	write_lock(current->rwlock_next);
+	write_unlock((**list)->rwlock_head);	
 	while (current != NULL) {
 		tmp = current;
 		current = current->next;
-
 		if (current != NULL) {
 			write_lock(current->rwlock_next);
 		}
 
 		write_unlock(tmp->rwlock_next);
-		delete_all(tmp);
-		free(tmp);
+		node_destroy(tmp);
 	}
 	rwlock_destroy((**list)->rwlock_head);
 	rwlock_destroy((**list)->rwlock_size);
+	free(**list);
 	free(*list);
 	*list = NULL;
 }
@@ -106,15 +105,10 @@ int list_insert(linked_list_t** list, int index, void* data) {
 		return 1;
 	}
 	node_t* current = (*list)->head;
-	node_t* node = malloc(sizeof(*node));
-	if (!node) {
-		return 1;
+	node_t* node = node_init(NULL,NULL,index,data);
+	if(node == NULL){
+	   return 1;
 	}
-	node->next = NULL;
-	node->previous = NULL;
-	node->index = index;
-	node->data = data;
-	init_all(node);
 	write_lock(current->rwlock_next);
 	while (current->next != NULL) {
 		current = current->next;
@@ -131,7 +125,7 @@ int list_insert(linked_list_t** list, int index, void* data) {
 		}
 		if (node->index == current->index) {
 			write_unlock(current->previous->rwlock_next);
-			free(node);
+			node_destroy(node);
 			return 1;
 		}
 
@@ -166,8 +160,7 @@ int list_remove(linked_list_t** list, int index) {
 				--(*list)->size;
 				write_unlock((*list)->rwlock_size);
 				write_unlock(current->previous->rwlock_next);
-				delete_all(current);
-				free(current);
+				node_destroy(current);
 				return 0;
 			}
 			//than he is the last in the list
@@ -177,8 +170,7 @@ int list_remove(linked_list_t** list, int index) {
 			--(*list)->size;
 			write_unlock((*list)->rwlock_size);
 			write_unlock(current->previous->rwlock_next);
-			delete_all(current);
-			free(current);
+			node_destroy(current);
 			return 0;
 		}
 		write_unlock(current->previous->rwlock_next);
@@ -224,32 +216,42 @@ int list_size(linked_list_t** list) {
 	return tmp_size;
 }
 
-int list_update_node(linked_list_t** plist, int index, void* data) {
+int list_update_node(linked_list_t** plist, int index, void* data){ 
 	if (plist == NULL || (*plist) == NULL || data == NULL) {
 		return 1;
 	}
 	linked_list_t* list = *plist;
 	read_lock(list->rwlock_head);
 	node_t* current = list->head;
+
 	read_lock(current->rwlock_next);
 	read_unlock(list->rwlock_head);
+//	fprintf(stderr,"update start loop");
+
 	while (current->next != NULL) {
 		if (current->next->index > index) {
-			read_unlock(current->rwlock_next);
-			return 1;
+		        break;
 		}
 		if (current->next->index == index) {
+	
 			write_lock(current->next->rwlock_data);
+			//fprintf(stderr,"#%d#",*(int*)data);
 			current->next->data = data;
+	     
 			write_unlock(current->next->rwlock_data);
 			read_unlock(current->rwlock_next);
+	
 			return 0;
 		}
-		read_lock(current->rwlock_next);
+	
+		read_lock(current->next->rwlock_next);
+	//	fprintf(stderr,"update-after-read_lock");	
 		current = current->next;
 		read_unlock(current->previous->rwlock_next);
 	}
 	read_unlock(current->rwlock_next);
+
+	
 	return 1;
 }
 
@@ -281,23 +283,23 @@ int list_node_compute(linked_list_t** list, int index,
 }
 //**************wrapper functions*********************************************//
 void* list_insert_wp(void* args) {
-	list_insert(((args_t*) args)->list, ((args_t*) args)->op.index,
-			((args_t*) args)->op.data);
+	list_insert(((args_t*) args)->list, ((args_t*) args)->op->index,
+			((args_t*) args)->op->data);
 }
 void* list_remove_wp(void* args) {
-	list_remove(((args_t*) args)->list, ((args_t*) args)->op.index);
+	list_remove(((args_t*) args)->list, ((args_t*) args)->op->index);
 }
 void* list_contains_wp(void* args) {
-	list_contains(((args_t*) args)->list, ((args_t*) args)->op.index);
+	list_contains(((args_t*) args)->list, ((args_t*) args)->op->index);
 }
 void* list_update_node_wp(void* args) {
-	list_update_node(((args_t*) args)->list, ((args_t*) args)->op.index,
-			((args_t*) args)->op.data);
+	list_update_node(((args_t*) args)->list, ((args_t*) args)->op->index,
+			((args_t*) args)->op->data);
 }
 void* list_node_compute_wp(void* args) {
-	list_node_compute(((args_t*) args)->list, ((args_t*) args)->op.index,
-			((args_t*) args)->op.compute_func,
-			(void**) (&(((args_t*) args)->op.result)));
+	list_node_compute(((args_t*) args)->list, ((args_t*) args)->op->index,
+			((args_t*) args)->op->compute_func,
+			(void**) (&(((args_t*) args)->op->result)));
 }
 //****************************************************************************//
 void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
@@ -309,7 +311,7 @@ void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
 	int i;
 	for (i = 0; i < num_ops; i++) {
 		args[i].list = list;
-		args[i].op = ops[i];
+		args[i].op = &(ops[i]);
 		switch (ops[i].op) {
 		case INSERT:
 			ops[i].result = pthread_create(&threads[i], NULL, list_insert_wp,
@@ -344,7 +346,7 @@ void list_print(linked_list_t** list) {
 	node_t* current = (*list)->head;
 	while (current->next != NULL) {
 		current = current->next;
-		printf(" %d  ",current->index);
+		fprintf(stderr," %d#%d  ",current->index,*(int*)(current->data));
 	}
-	printf("\n");
+	fprintf(stderr,"\n");
 }
