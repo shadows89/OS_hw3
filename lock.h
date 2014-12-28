@@ -27,7 +27,7 @@ typedef enum RWLockResult{
 	SUCCESS, NULL_PARAM, NOT_INIT, IS_LOCKED, MUTEX_ERR
 } RWLockResult;
 
-#define MAX_SIMUL_READERS 15
+#define MAX_READERS_STARVE 15
 
 typedef struct rwlock_t  {
 	int num_of_readers;				//number of active readers
