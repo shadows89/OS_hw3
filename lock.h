@@ -8,32 +8,38 @@
 #ifndef LOCK_H_
 #define LOCK_H_
 
+
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <errno.h>
 
 /*
  * RWLockResult (return results):
  * 		SUCCESS - in case of success
  * 		NULL_PARAM - null parameter has been passed
  * 		NOT_INIT - the lock isn't initialized or being destroyed
- * 		IS_LOCKED - the lock could not be acquired because it was already locked
+ * 		IS_LOCKED - the mutex is already locked by the calling thread
+ * 					/////the mutex is locked by another thread (only for destroy function)////
+ * 		MUTEX_ERR -
  */
 typedef enum RWLockResult{
-	SUCCESS, NULL_PARAM, NOT_INIT, IS_LOCKED
+	SUCCESS, NULL_PARAM, NOT_INIT, IS_LOCKED, MUTEX_ERR
 } RWLockResult;
 
 #define MAX_SIMUL_READERS 15
 
 typedef struct rwlock_t  {
-	int num_of_readers;
+	int num_of_readers;				//number of active readers
 	pthread_cond_t readers_cond;
 
-	int num_of_writers;
+	int num_of_writers;				//number of active writers
 	pthread_cond_t writers_cond;
 
 	pthread_mutex_t mutex_lock;
+	pthread_mutexattr_t mutex_attr;
 
+	int readers_starve_count;
 	int readers_waiting;
 	int writers_waiting;
 	bool valid_lock;				//the lock isn't being destroyed (is usable)
