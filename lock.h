@@ -34,7 +34,7 @@ typedef struct rwlock_t  {
 
 	pthread_mutex_t mutex_lock;
 
-	int simul_readers; 				//simultaneous readers
+	int readers_waiting;
 	int writers_waiting;
 	bool valid_lock;				//the lock isn't being destroyed (is usable)
 } *rwlock_t;
