@@ -5,6 +5,7 @@
  *      Author: da
  */
 
+#define _GNU_SOURCE 1
 #include "lock.h"
 
 /*	mutex_lock:
@@ -86,7 +87,7 @@ RWLockResult rwl_readlock(rwlock_t rwl) {
 //	checks whether the mutex is initialized or being destroyed.
 //	this check is before the lock because the mutex may be not initialized
 //	or in the middle of the destroying process.
-	if (rwl->valid_lock != true) {
+	if (rwl->valid_lock == false) {
 		return NOT_INIT;
 	}
 	result = mutex_lock(rwl);
@@ -149,7 +150,7 @@ RWLockResult rwl_writelock(rwlock_t rwl) {
 	}
 
 //	the explanation as rwl_readlock
-	if (rwl->valid_lock != true) {
+	if (rwl->valid_lock == false) {
 		return NOT_INIT;
 	}
 	result = mutex_lock(rwl);

@@ -11,8 +11,12 @@
 
 #include <pthread.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <errno.h>
+
+/*
+ANSI standard C doesn`t have stdbool.h library.
+*/
+typedef enum {false, true} bool;
 
 /*
  * RWLockResult (return results):
