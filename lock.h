@@ -20,7 +20,6 @@
  * 		NULL_PARAM - null parameter has been passed
  * 		NOT_INIT - the lock isn't initialized or being destroyed
  * 		IS_LOCKED - the mutex is already locked by the calling thread
- * 					/////the mutex is locked by another thread (only for destroy function)////
  * 		MUTEX_ERR -
  */
 typedef enum RWLockResult{
@@ -51,13 +50,9 @@ RWLockResult rwl_destroy(rwlock_t rwl);
 
 RWLockResult rwl_readlock(rwlock_t rwl);
 
-//RWLockResult rwl_readtrylock(rwlock_t rwl); need it?
-
 RWLockResult rwl_readunlock(rwlock_t rwl);
 
 RWLockResult rwl_writelock(rwlock_t rwl);
-
-//RWLockResult rwl_writetrylock(rwlock_t rwl); need it?
 
 RWLockResult rwl_writeunlock(rwlock_t rwl);
 

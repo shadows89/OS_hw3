@@ -8,13 +8,13 @@
 #include "lock.h"
 
 /*	mutex_lock:
- *	locks the mutex if possible
+ *	locks the mutex (critical code) if possible
  *	returns RWLockResult;
  *	 */
 RWLockResult mutex_lock(rwlock_t rwl);
 
 rwlock_t rwl_init() {
-	rwlock_t rwl; //
+	rwlock_t rwl;
 	rwl = malloc(sizeof(struct rwlock_t));
 	if (!rwl) {
 		return NULL;
@@ -48,17 +48,15 @@ RWLockResult rwl_destroy(rwlock_t rwl) {
 	if (rwl == NULL) {
 		return NULL_PARAM;
 	}
+	if (rwl->valid_lock == false) {
+		return NOT_INIT;
+	}
 	result = mutex_lock(rwl);
 	if (result != SUCCESS) {
 		return result;
 	}
 
-	if (rwl->valid_lock == false) {
-//		pthread_mutex_unlock(&rwl->mutex_lock); TODO
-		return NOT_INIT;
-	}
-
-	rwl->valid_lock = false; // indicates that the lock are going to be destroyed
+	rwl->valid_lock = false; //indicates that the lock are going to be destroyed
 
 	//waiting until the are no readers and writers active or waiting
 	while (rwl->num_of_readers > 0 || rwl->num_of_writers > 0
@@ -84,16 +82,18 @@ RWLockResult rwl_readlock(rwlock_t rwl) {
 	if (rwl == NULL) {
 		return NULL_PARAM;
 	}
+
+//	checks whether the mutex is initialized or being destroyed.
+//	this check is before the lock because the mutex may be not initialized
+//	or in the middle of the destroying process.
+	if (rwl->valid_lock != true) {
+		return NOT_INIT;
+	}
 	result = mutex_lock(rwl);
 	if (result != SUCCESS) {
 		return result;
 	}
-	if (rwl->valid_lock == false) {
-//		pthread_mutex_unlock(&rwl->mutex_lock); TODO
-		return NOT_INIT;
-	}
 
-	//active writesimul_readersr or MAX_SIMUL_READERS readers
 	if ((rwl->num_of_writers > 0
 			|| rwl->readers_starve_count == MAX_READERS_STARVE)) {
 		rwl->readers_waiting++;
@@ -104,13 +104,13 @@ RWLockResult rwl_readlock(rwlock_t rwl) {
 		rwl->readers_waiting--;
 	}
 
-	//some threads are already readying
+	//some threads are already readying regarding to rwl_writeunlock function
 	if (rwl->writers_waiting > 0) {
 		if (rwl->readers_starve_count < MAX_READERS_STARVE) { //shouldn't happen but in case
 			rwl->readers_starve_count++;
 		}
 	}
-	rwl->num_of_readers++;
+	rwl->num_of_readers++; //increases active readers number
 	pthread_mutex_unlock(&rwl->mutex_lock);
 	return SUCCESS;
 }
@@ -124,12 +124,18 @@ RWLockResult rwl_readunlock(rwlock_t rwl) {
 	if (result != SUCCESS) {
 		return result;
 	}
+
+/*	TODO: REMOVE
+ * 	we need to check this only when we want to lock because we want to wait
+ * 	until all readers and writes (active/waiting) are done and unlock the lock
+ * 	for destroy
 	if (rwl->valid_lock == false) {
-//		pthread_mutex_unlock(&rwl->mutex_lock); TODO
+		pthread_mutex_unlock(&rwl->mutex_lock);
 		return NOT_INIT;
 	}
+	*/
 	rwl->num_of_readers--;
-	if (rwl->num_of_readers == 0) {
+	if (rwl->num_of_readers == 0 && rwl->writers_waiting > 0) {
 		pthread_cond_signal(&rwl->writers_cond);
 	}
 	pthread_mutex_unlock(&rwl->mutex_lock);
@@ -141,14 +147,16 @@ RWLockResult rwl_writelock(rwlock_t rwl) {
 	if (rwl == NULL) {
 		return NULL_PARAM;
 	}
+
+//	the explanation as rwl_readlock
+	if (rwl->valid_lock != true) {
+		return NOT_INIT;
+	}
 	result = mutex_lock(rwl);
 	if (result != SUCCESS) {
 		return result;
 	}
-	if (rwl->valid_lock == false) {
-//		pthread_mutex_unlock(&rwl->mutex_lock); TODO
-		return NOT_INIT;
-	}
+
 	if ((rwl->num_of_writers || rwl->num_of_readers > 0)) {
 		rwl->writers_waiting++;
 		while (rwl->num_of_writers > 0 || rwl->num_of_readers > 0) {
@@ -167,14 +175,21 @@ RWLockResult rwl_writeunlock(rwlock_t rwl) {
 	if (rwl == NULL) {
 		return NULL_PARAM;
 	}
+
 	result = mutex_lock(rwl);
 	if (result != SUCCESS) {
 		return result;
 	}
+
+/*	TODO: REMOVE
+	we need to check this only when we want to lock because we want to wait
+* 	until all readers and writes (active/waiting) are done and unlock the lock
+* 	for destroy
 	if (rwl->valid_lock == false) {
-//		pthread_mutex_unlock(&rwl->mutex_lock); TODO
+//		pthread_mutex_unlock(&rwl->mutex_lock);
 		return NOT_INIT;
 	}
+*/
 	rwl->num_of_writers=0;
 	if(rwl->readers_waiting>0){
 		pthread_cond_broadcast(&rwl->readers_cond);
