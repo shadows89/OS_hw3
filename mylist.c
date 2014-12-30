@@ -181,10 +181,10 @@ int list_remove(linked_list_t** list, int index) {
 		return 1;
 	}
 	rwl_writelock(current->np_lock); // Remove from NOT an empty list
-	if (current->index == index) {	// Node is head
-		if (current->next == NULL)	// Head is only node
+	if (current->index == index) { // Node is head
+		if (current->next == NULL) // Head is only node
 			(**list).head = NULL;
-		else{
+		else {
 			rwl_writelock(current->next->np_lock);
 			(**list).head = current->next;
 			(**list).head->prev = NULL;
@@ -207,8 +207,7 @@ int list_remove(linked_list_t** list, int index) {
 				current->next->prev = current->prev;
 				current->prev->next = current->next;
 				rwl_writeunlock(current->next->np_lock);
-			}
-			else {						// prev exist, next does not exist
+			} else { // prev exist, next does not exist
 				current->prev->next = NULL;
 			}
 			rwl_writeunlock(current->prev->np_lock);
@@ -219,11 +218,11 @@ int list_remove(linked_list_t** list, int index) {
 			rwl_writeunlock((*list)->size_lock);
 			return 0;
 		}
-		if(current->next == NULL){  // current->index != index
+		if (current->next == NULL) { // current->index != index
 			rwl_writeunlock(current->np_lock);
 			return 1;
 		}
-		rwl_writelock(current->next->np_lock);  // current->next != NULL
+		rwl_writelock(current->next->np_lock); // current->next != NULL
 		current = current->next;
 		rwl_writeunlock(current->prev->np_lock);
 	}
@@ -233,11 +232,26 @@ int list_remove(linked_list_t** list, int index) {
 int list_contains(linked_list_t** list, int index) {
 	if (list == NULL || *list == NULL)
 		return 0;
-	node_t* currnet = (*list)->head;
-	while (currnet != NULL) {
-		if (currnet->index == index)
+	rwl_readlock((*list)->head_lock);
+	node_t* current = (*list)->head;
+	if (current == NULL) { // Empty list
+		rwl_readunlock((*list)->head_lock);
+		return 0;
+	}
+	rwl_readlock(current->np_lock);
+	rwl_readunlock((*list)->head_lock);
+	while (current != NULL) { // Iterating over list
+		if (current->index == index) { // Found index
+			rwl_readunlock(current->np_lock);
 			return 1;
-		currnet = currnet->next;
+		}
+		if (current->next == NULL) { // End of list - index not found
+			rwl_readunlock(current->np_lock);
+			return 0;
+		}
+		rwl_readlock(current->next->np_lock);
+		current = current->next;
+		rwl_readunlock(current->prev->np_lock);
 	}
 	return 0;
 }
@@ -253,28 +267,60 @@ void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
 int list_update_node(linked_list_t** list, int index, void* data) {
 	if (list == NULL || *list == NULL || data == NULL)
 		return 1;
+	rwl_readlock((*list)->head_lock);
 	node_t* current = (*list)->head;
+	if (current == NULL) { // Empty list
+		rwl_readunlock((*list)->head_lock);
+		return 1;
+	}
+	rwl_readlock(current->np_lock);
+	rwl_readunlock((*list)->head_lock);
 	while (current != NULL) {
 		if (current->index == index) {
+			rwl_writelock(current->data_lock);
 			current->data = data;
+			rwl_writeunlock(current->data_lock);
+			rwl_readunlock(current->np_lock);
 			return 0;
 		}
+		if (current->next == NULL) {
+			rwl_readunlock(current->np_lock);
+			return 1;
+		}
+		rwl_readlock(current->next->np_lock);
 		current = current->next;
+		rwl_readunlock(current->prev->np_lock);
 	}
 	return 1;
 }
 
 int list_node_compute(linked_list_t** list, int index,
 		void *(*compute_func)(void *), void** result) {
-	if (list == NULL || *list == NULL)
+	if (list == NULL || *list == NULL || compute_func == NULL || result == NULL)
 		return 1;
+	rwl_readlock((*list)->head_lock);
 	node_t* current = (*list)->head;
+	if (current == NULL) { // Empty list
+		rwl_readunlock((*list)->head_lock);
+		return 1;
+	}
+	rwl_readlock(current->np_lock);
+	rwl_readunlock((*list)->head_lock);
 	while (current != NULL) {
 		if (current->index == index) {
+			rwl_readlock(current->data_lock);
 			*result = (*compute_func)(current->data);
+			rwl_readunlock(current->data_lock);
+			rwl_readunlock(current->np_lock);
 			return 0;
 		}
+		if (current->next == NULL) {
+			rwl_readunlock(current->np_lock);
+			return 1;
+		}
+		rwl_readlock(current->next->np_lock);
 		current = current->next;
+		rwl_readunlock(current->prev->np_lock);
 	}
 	return 1;
 }
