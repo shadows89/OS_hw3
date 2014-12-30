@@ -99,9 +99,9 @@ void* aux_list_update_node(void* args) {
 
 void* aux_list_node_compute(void* args) {
 	void* tmp;
-	list_node_compute(((arg*) args)->list,((arg*) args)->op->index,
-			((arg*) args)->op->compute_func,&tmp);
-	((arg*) args)->op->result = (int)tmp; // TODO check gavno!!!!
+	list_node_compute(((arg*) args)->list, ((arg*) args)->op->index,
+			((arg*) args)->op->compute_func, &tmp);
+	((arg*) args)->op->result = (int) tmp; // TODO check gavno!!!!
 	return NULL;
 }
 
@@ -301,35 +301,36 @@ void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
 	if (list == NULL || *list == NULL || ops == NULL)
 		return;
 	int i = 0;
-	pthread_t* threads = malloc(sizeof(pthread_t) * num_ops);
-	if (threads == NULL)
-		return;
-	arg args;
-	args.list = list;
+//	pthread_t* threads = malloc(sizeof(pthread_t) * num_ops);
+//	if (threads == NULL)
+//		return;
+	pthread_t threads[num_ops];
+	arg args[num_ops];
 	for (i = 0; i < num_ops; i++) {
-		args.op = ops + i;
+		args[i].list = list;
+		args[i].op = ops + i;
 		switch ((ops[i]).op) {
 		case INSERT:
-			pthread_create(&threads[i], NULL, aux_list_insert, &args);
+			pthread_create(&threads[i], NULL, aux_list_insert, args + i);
 			break;
 		case REMOVE:
-			pthread_create(&threads[i], NULL, aux_list_remove, &args);
+			pthread_create(&threads[i], NULL, aux_list_remove, args + i);
 			break;
 		case CONTAINS:
-			pthread_create(&threads[i], NULL, aux_list_contains, &args);
+			pthread_create(&threads[i], NULL, aux_list_contains, args + i);
 			break;
 		case UPDATE:
-			pthread_create(&threads[i], NULL, aux_list_update_node, &args);
+			pthread_create(&threads[i], NULL, aux_list_update_node, args + i);
 			break;
 		case COMPUTE:
-			pthread_create(&threads[i], NULL, aux_list_node_compute, &args);
+			pthread_create(&threads[i], NULL, aux_list_node_compute, args + i);
 			break;
 		}
 	}
-	for(i = 0 ; i < num_ops ;i++){
-		pthread_join(threads[i],NULL);
+	for (i = 0; i < num_ops; i++) {
+		pthread_join(threads[i], NULL);
 	}
-	free(threads);
+//	free(threads);
 }
 
 int list_update_node(linked_list_t** list, int index, void* data) {
