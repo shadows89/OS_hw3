@@ -12,7 +12,7 @@
  put 0<N<250 even. for num of threads
  T for sleep time
  *******/
-#define N 200
+#define N 50
 #define T 5
 
 #define SLEEP usleep(rand()%T);
@@ -89,7 +89,7 @@ args_t* args_init(linked_list_t* list, int index, int data, Compute compute,int 
    args->compute = compute;
    args->out = NULL;
    args->num_ops = num_ops;
-   args->ops = ops;
+   args->ops = ops; 
    return args;
 }
 
@@ -121,7 +121,7 @@ void* identity(void* data){
    int num_ops = qargs->num_ops;\
    op_t* ops = qargs->ops;\
    *(qargs->result) = (func);
-
+ 
 void* list_size_rp(void* args){
    CALL_FUNC(list_size(&list))
 }
@@ -132,7 +132,7 @@ void* list_remove_rp(void* args){
     CALL_FUNC(list_remove(&list,index))
 }
 void* list_update_node_rp(void* args){
-   CALL_FUNC( list_update_node(&list,index,data))
+   CALL_FUNC( list_update_node(&list,index,data)) 
 }
 void* list_contains_rp(void* args){
    CALL_FUNC( list_contains(&list,index))
@@ -146,7 +146,7 @@ Wrapper wrappers[5]={list_insert_rp,
   			list_remove_rp,
 		     	list_update_node_rp,
 			list_node_compute_rp,
-			list_size_rp};
+			list_size_rp};			
 
 void* list_batch_rp(void* args){
    SLEEP;
@@ -179,18 +179,18 @@ int test_list(){
    TEST(list_contains(list,2)==0);
    TEST(list_contains(list,0)==1);
    TEST(list_contains(list,4)==1);
-   TEST(list_size(list)==3);
+   TEST(list_size(list)==3);  
    TEST(list_update_node(list,0,&(nums[2]))==0);
    void* ptr;
    TEST(list_node_compute(list,2,identity,&(ptr))>0 );
    TEST(list_node_compute(list,4,identity,&(ptr))==0 );
-   TEST((*(int*)ptr)==4);
+   TEST((*(int*)ptr)==4); 
    list_free(&list);
    return result;
 }
 
-int test_simple_insert(){
-   INIT_RAND
+int test_simple_insert(){ 
+   INIT_RAND 
      int size = 0;
    for(i=0;i<N;i++){
       pthread_create(&(threads[i]),NULL,list_insert_rp,args_p[i]);
@@ -210,7 +210,7 @@ int test_simple_insert(){
 }
 
 int test_double_insert(){
-    INIT
+    INIT 
    for(i=0;i<N;i++){
       pthread_create(&(threads[i]),NULL,list_insert_rp,args_p[i]);
    }
@@ -256,7 +256,7 @@ int test_update_compute(){
    for(i=0;i<N;i++){
       TEST(pthread_join(threads[i],NULL)==0)
    }
-   args_t* args_q[N];
+   args_t* args_q[N];	
    for(i=0;i<N;i++){
       args_q[i] = args_init(*list,i,-i,identity,0,NULL);
    }
@@ -324,14 +324,16 @@ int test_batch(){
      pthread_create(&(threads[i]),NULL,list_batch_rp,args_p[i]);
      pthread_join(threads[i],NULL);
   }
-// TEST((*(int*)(ops[4].result)) == 1);
-// TEST((*(int*)ops[12].result) == 60);
-// TEST(*((int*)ops[13].result) == 40);
- list_free(&list);
- for(i=0;i<2;i++){
+  if (sizeof(int*) == sizeof(int) ) {
+      TEST((*(int*)ops[4].result) == 1);
+      TEST((*(int*)ops[12].result) == 60);
+      TEST((*(int*)ops[13].result) == 40);
+   }
+  list_free(&list);
+  for(i=0;i<2;i++){
      args_destroy(&(args_p[i]));
   }
- return result;
+  return result;
 }
 
 
@@ -339,9 +341,8 @@ int test_batch(){
 int test_stress(){
   INIT
   for(i=0;i<N;i++){
-      TEST(pthread_create(&(threads[i]),NULL,list_insert_rp,args_p[i]) == 0)
+     pthread_create(&(threads[i]),NULL,list_insert_rp,args_p[i]);   
   }
-  /*
   for(i=0;i<1000;i++){
      int rand_thread  = rand()%N;
      int rand_func = rand()%5;
@@ -351,21 +352,21 @@ int test_stress(){
      }
      pthread_create(&(threads[rand_thread]),NULL,wrappers[rand_func],args_p[rand_args]);
   }
-  */
   for(i=0;i<N;i++){
-    TEST(pthread_join(threads[i],NULL) == 0);
+     pthread_join(threads[i],NULL);   
   }
+
   DESTROY
   return result;
 }
-
+ 
 int main(){
    srand(time(NULL));
    RUN_TEST(test_list);
    RUN_TEST(test_simple_insert)
    RUN_TEST(test_double_insert)
    RUN_TEST(test_insert_remove)
-   RUN_TEST(test_update_compute)
+   RUN_TEST(test_update_compute) 
    RUN_TEST(test_batch)
    RUN_TEST(test_stress);
    return 0;
