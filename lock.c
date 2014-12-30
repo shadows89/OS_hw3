@@ -190,13 +190,13 @@ RWLockResult mutex_lock(rwlock_t rwl) {
 	return SUCCESS;
 }
 
-int main() {
-
-	/* 	rwlock_t rwl = rwl_init();
-	 printf("%d",rwl->num_of_readers);
-	 printf("%d",rwl->num_of_writers);
-	 free(rwl);*/
-
-	return 0;
-}
+//int main() {
+//
+//	/* 	rwlock_t rwl = rwl_init();
+//	 printf("%d",rwl->num_of_readers);
+//	 printf("%d",rwl->num_of_writers);
+//	 free(rwl);*/
+//
+//	return 0;
+//}
 
