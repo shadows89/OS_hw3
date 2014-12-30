@@ -3,6 +3,11 @@
 #include "mylist.h"
 #include "lock.h"
 
+typedef struct {
+	linked_list_t** list;
+	op_t* op;
+} arg;
+
 struct node_t;
 typedef struct node_t node_t;
 
@@ -66,6 +71,38 @@ void initNewHead(node_t* newHead, node_t* oldHead) {
 	newHead->prev = NULL;
 	newHead->next = oldHead;
 	oldHead->prev = newHead;
+}
+
+void* aux_list_insert(void* args) {
+	((arg*) args)->op->result = list_insert(((arg*) args)->list,
+			((arg*) args)->op->index, ((arg*) args)->op->data);
+	return NULL;
+}
+
+void* aux_list_remove(void* args) {
+	((arg*) args)->op->result = list_remove(((arg*) args)->list,
+			((arg*) args)->op->index);
+	return NULL;
+}
+
+void* aux_list_contains(void* args) {
+	((arg*) args)->op->result = list_contains(((arg*) args)->list,
+			((arg*) args)->op->index);
+	return NULL;
+}
+
+void* aux_list_update_node(void* args) {
+	((arg*) args)->op->result = list_update_node(((arg*) args)->list,
+			((arg*) args)->op->index, ((arg*) args)->op->data);
+	return NULL;
+}
+
+void* aux_list_node_compute(void* args) {
+	void* tmp;
+	list_node_compute(((arg*) args)->list,((arg*) args)->op->index,
+			((arg*) args)->op->compute_func,&tmp);
+	((arg*) args)->op->result = *((int*)tmp); // TODO check gavno!!!!
+	return NULL;
 }
 
 linked_list_t** list_alloc() {
@@ -261,7 +298,37 @@ int list_size(linked_list_t** list) {
 }
 
 void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
-
+	if (list == NULL || *list == NULL || ops == NULL)
+		return;
+	int i = 0;
+	pthread_t** threads = malloc(sizeof(pthread_t*) * num_ops);
+	if (threads == NULL)
+		return;
+	arg args;
+	args.list = list;
+	for (i = 0; i < num_ops; i++) {
+		args.op = ops + i;
+		switch ((ops[i]).op) {
+		case INSERT:
+			pthread_create(threads[i], NULL, &aux_list_insert, &args);
+			break;
+		case REMOVE:
+			pthread_create(threads[i], NULL, &aux_list_remove, &args);
+			break;
+		case CONTAINS:
+			pthread_create(threads[i], NULL, &aux_list_contains, &args);
+			break;
+		case UPDATE:
+			pthread_create(threads[i], NULL, &aux_list_update_node, &args);
+			break;
+		case COMPUTE:
+			pthread_create(threads[i], NULL, &aux_list_node_compute, &args);
+			break;
+		}
+	}
+	for(i = 0 ; i < num_ops ;i++)
+		pthread_join(*(threads[i]),NULL);
+	free(threads);
 }
 
 int list_update_node(linked_list_t** list, int index, void* data) {
