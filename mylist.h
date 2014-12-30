@@ -17,7 +17,7 @@ typedef struct op_t
 
 linked_list_t** list_alloc();
 
-void list_free(linked_list_t** list);
+void list_free(linked_list_t*** list);
 
 int list_insert(linked_list_t** list, int index, void* data);
 
@@ -25,7 +25,7 @@ int list_remove(linked_list_t** list, int index);
 
 int list_contains(linked_list_t** list, int index);
 
-int list_size(linked_list_t** list);   /*changed ask in piazza*/
+int list_size(linked_list_t** list);
 
 void list_batch(linked_list_t** list, int num_ops, op_t* ops);
 
