@@ -62,18 +62,18 @@ RWLockResult rwl_destroy(rwlock_t rwl) {
 	//waiting until the are no readers and writers active or waiting
 	while (rwl->num_of_readers > 0 || rwl->num_of_writers > 0
 			|| rwl->readers_waiting != 0 || rwl->writers_waiting != 0) {
-		/* TODO: not sure if needed already locked and waiting in the queue
+		/// TODO: not sure if needed already locked and waiting in the queue
 		 pthread_mutex_unlock(&rwl->mutex_lock);
 		 pthread_mutex_lock(&rwl->mutex_lock);
-		 */
+
 	}
 
 	//destroying process started
 	pthread_cond_destroy(&rwl->writers_cond);
 	pthread_cond_destroy(&rwl->readers_cond);
 	pthread_mutex_unlock(&rwl->mutex_lock);
-	pthread_mutex_destroy(&rwl->mutex_lock);
 	pthread_mutexattr_destroy(&rwl->mutex_attr); //TODO: check if needed
+	pthread_mutex_destroy(&rwl->mutex_lock);
 	free(rwl);
 	return SUCCESS;
 }

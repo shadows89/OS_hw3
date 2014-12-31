@@ -236,9 +236,15 @@ int list_remove(linked_list_t** list, int index) {
 		return 0;
 	}
 	rwl_writeunlock((*list)->head_lock);
+	if(current->next == NULL){
+		rwl_writeunlock(current->np_lock);
+		return 1;
+	}
+	rwl_writelock(current->next->np_lock);
+	current = current->next;
 	while (current != NULL) {
 		if (current->index == index) { // Found node with index BUT NOT HEAD
-			rwl_writelock(current->prev->np_lock);
+			//rwl_writelock(current->prev->np_lock); // TODO prev
 			if (current->next != NULL) { // prev exist, next exist
 				rwl_writelock(current->next->np_lock);
 				current->next->prev = current->prev;
@@ -256,12 +262,14 @@ int list_remove(linked_list_t** list, int index) {
 			return 0;
 		}
 		if (current->next == NULL) { // current->index != index
+			rwl_writeunlock(current->prev->np_lock);
 			rwl_writeunlock(current->np_lock);
 			return 1;
 		}
 		rwl_writelock(current->next->np_lock); // current->next != NULL
-		current = current->next;
 		rwl_writeunlock(current->prev->np_lock);
+		current = current->next;
+		//rwl_writeunlock(current->prev->np_lock);
 	}
 	return 1;
 }
@@ -294,7 +302,12 @@ int list_contains(linked_list_t** list, int index) {
 }
 
 int list_size(linked_list_t** list) {
-	return (**list).numberOfElements;
+	if (list == NULL || *list == NULL)
+		return 0;
+	rwl_readlock((*list)->size_lock);
+	int tmp_size = (*list)->numberOfElements;
+	rwl_readunlock((*list)->size_lock);
+	return tmp_size;
 }
 
 void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
