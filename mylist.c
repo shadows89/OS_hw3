@@ -145,6 +145,7 @@ void list_free(linked_list_t*** list) {
 	rwl_destroy(c_list->size_lock);
 	free(**list);
 	free(*list);
+	*list = NULL;
 }
 
 int list_insert(linked_list_t** list, int index, void* data) {
@@ -302,7 +303,7 @@ int list_contains(linked_list_t** list, int index) {
 
 int list_size(linked_list_t** list) {
 	if (list == NULL || *list == NULL)
-		return 0;
+		return -1;
 	int tmp_size = 0;
 	rwl_writelock((*list)->size_lock);
 	tmp_size = (*list)->numberOfElements;
