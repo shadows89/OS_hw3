@@ -128,44 +128,44 @@ linked_list_t** list_alloc() {
 void list_free(linked_list_t*** list) {
 	if (list == NULL || *list == NULL || **list == NULL)
 		return;
-	rwl_writelock((**list)->head_lock);
-	linked_list_t* c_list = **list;
-	node_t* current = c_list->head;
+	linked_list_t** c_list = *list;
+	*list = NULL;
+	rwl_writelock((*c_list)->head_lock);
+	node_t* current = (*c_list)->head;
 	node_t* next = NULL;
 	while (current != NULL) {
 		next = current->next;
 		nodeDestroy(current);
 		current = next;
 	}
-	rwl_writelock(c_list->size_lock);
-	c_list->numberOfElements = 0;
-	rwl_writeunlock(c_list->size_lock);
-	rwl_writeunlock((**list)->head_lock);
-	rwl_destroy(c_list->head_lock);
-	rwl_destroy(c_list->size_lock);
-	free(**list);
-	free(*list);
-	*list = NULL;
+	rwl_writelock((*c_list)->size_lock);
+	(*c_list)->numberOfElements = 0;
+	rwl_writeunlock((*c_list)->size_lock);
+	rwl_writeunlock((*c_list)->head_lock);
+	rwl_destroy((*c_list)->head_lock);
+	rwl_destroy((*c_list)->size_lock);
+	free(*c_list);
+	free(c_list);
 }
 
 int list_insert(linked_list_t** list, int index, void* data) {
 	if (list == NULL || *list == NULL)
 		return 1;
-	rwl_writelock((*list)->head_lock);
+	linked_list_t* c_list = *list;
+	rwl_writelock((c_list)->head_lock);
 	node_t* newNode = malloc(sizeof(node_t));
 	nodeInit(index, data, newNode);
 	if (newNode == NULL) { // If failed to init node (exit)
-		rwl_writeunlock((*list)->head_lock);
+		rwl_writeunlock((c_list)->head_lock);
 		return 1;
 	}
-	linked_list_t* c_list = *list;
 	node_t* current = c_list->head;
 	if (current == NULL) { // Insert new node to an empty list
 		c_list->head = newNode;
-		rwl_writelock((*list)->size_lock);
+		rwl_writelock((c_list)->size_lock);
 		c_list->numberOfElements++;
-		rwl_writeunlock((*list)->size_lock);
-		rwl_writeunlock((*list)->head_lock);
+		rwl_writeunlock((c_list)->size_lock);
+		rwl_writeunlock((c_list)->head_lock);
 		return 0;
 	} else { // Insert new node to NOT an empty list
 		rwl_writelock(current->np_lock);
@@ -173,14 +173,14 @@ int list_insert(linked_list_t** list, int index, void* data) {
 	if (index < current->index) { // Replace head (NOT an empty list)
 		initNewHead(newNode, current);
 		c_list->head = newNode;
-		rwl_writelock((*list)->size_lock);
+		rwl_writelock((c_list)->size_lock);
 		c_list->numberOfElements++;
-		rwl_writeunlock((*list)->size_lock);
-		rwl_writeunlock((*list)->head_lock);
+		rwl_writeunlock((c_list)->size_lock);
+		rwl_writeunlock((c_list)->head_lock);
 		rwl_writeunlock(current->np_lock);
 		return 0;
 	}
-	rwl_writeunlock((*list)->head_lock);
+	rwl_writeunlock((c_list)->head_lock);
 	while (current != NULL) { // Iterating over NOT empty list
 		if (current->index == index) { // Existing node with index
 			rwl_writeunlock(current->np_lock);
@@ -201,9 +201,9 @@ int list_insert(linked_list_t** list, int index, void* data) {
 		rwl_writeunlock(current->prev->np_lock);
 
 	}
-	rwl_writelock((*list)->size_lock); // Added newNode to list
+	rwl_writelock((c_list)->size_lock); // Added newNode to list
 	c_list->numberOfElements++;
-	rwl_writeunlock((*list)->size_lock);
+	rwl_writeunlock((c_list)->size_lock);
 	rwl_writeunlock(current->np_lock);
 	return 0;
 }
@@ -211,31 +211,32 @@ int list_insert(linked_list_t** list, int index, void* data) {
 int list_remove(linked_list_t** list, int index) {
 	if (list == NULL || *list == NULL)
 		return 1;
-	rwl_writelock((*list)->head_lock);
-	node_t* current = (*list)->head;
+	linked_list_t* c_list = *list;
+	rwl_writelock((c_list)->head_lock);
+	node_t* current = (c_list)->head;
 	if (current == NULL) { // Remove from empty list
-		rwl_writeunlock((*list)->head_lock);
+		rwl_writeunlock((c_list)->head_lock);
 		return 1;
 	}
 	rwl_writelock(current->np_lock); // Remove from NOT an empty list
 	if (current->index == index) { // Node is head
 		if (current->next == NULL) // Head is only node
-			(**list).head = NULL;
+			(*c_list).head = NULL;
 		else {
 			rwl_writelock(current->next->np_lock);
-			(**list).head = current->next;
-			(**list).head->prev = NULL;
+			(*c_list).head = current->next;
+			(*c_list).head->prev = NULL;
 			rwl_writeunlock(current->next->np_lock);
 		}
-		rwl_writelock((*list)->size_lock); // Removed a node from list
-		(*list)->numberOfElements--;
-		rwl_writeunlock((*list)->size_lock);
+		rwl_writelock((c_list)->size_lock); // Removed a node from list
+		(c_list)->numberOfElements--;
+		rwl_writeunlock((c_list)->size_lock);
 		rwl_writeunlock(current->np_lock);
-		rwl_writeunlock((*list)->head_lock);
+		rwl_writeunlock((c_list)->head_lock);
 		nodeDestroy(current);
 		return 0;
 	}
-	rwl_writeunlock((*list)->head_lock);
+	rwl_writeunlock((c_list)->head_lock);
 	if(current->next == NULL){
 		rwl_writeunlock(current->np_lock);
 		return 1;
@@ -253,9 +254,9 @@ int list_remove(linked_list_t** list, int index) {
 			} else { // prev exist, next does not exist
 				current->prev->next = NULL;
 			}
-			rwl_writelock((*list)->size_lock); // Removed a node from list
-			(*list)->numberOfElements--;
-			rwl_writeunlock((*list)->size_lock);
+			rwl_writelock((c_list)->size_lock); // Removed a node from list
+			(c_list)->numberOfElements--;
+			rwl_writeunlock((c_list)->size_lock);
 			rwl_writeunlock(current->prev->np_lock);
 			rwl_writeunlock(current->np_lock);
 			nodeDestroy(current);
@@ -277,14 +278,15 @@ int list_remove(linked_list_t** list, int index) {
 int list_contains(linked_list_t** list, int index) {
 	if (list == NULL || *list == NULL)
 		return 0;
-	rwl_readlock((*list)->head_lock);
-	node_t* current = (*list)->head;
+	linked_list_t* c_list = *list;
+	rwl_readlock((c_list)->head_lock);
+	node_t* current = (c_list)->head;
 	if (current == NULL) { // Empty list
-		rwl_readunlock((*list)->head_lock);
+		rwl_readunlock((c_list)->head_lock);
 		return 0;
 	}
 	rwl_readlock(current->np_lock);
-	rwl_readunlock((*list)->head_lock);
+	rwl_readunlock((c_list)->head_lock);
 	while (current != NULL) { // Iterating over list
 		if (current->index == index) { // Found index
 			rwl_readunlock(current->np_lock);
@@ -304,10 +306,13 @@ int list_contains(linked_list_t** list, int index) {
 int list_size(linked_list_t** list) {
 	if (list == NULL || *list == NULL)
 		return -1;
+	linked_list_t* c_list = *list;
+	rwl_readlock((c_list)->head_lock);
 	int tmp_size = 0;
-	rwl_writelock((*list)->size_lock);
-	tmp_size = (*list)->numberOfElements;
-	rwl_writeunlock((*list)->size_lock);
+	rwl_writelock((c_list)->size_lock);
+	tmp_size = (c_list)->numberOfElements;
+	rwl_writeunlock((c_list)->size_lock);
+	rwl_readunlock((c_list)->head_lock);
 	return tmp_size;
 }
 
@@ -350,14 +355,15 @@ void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
 int list_update_node(linked_list_t** list, int index, void* data) {
 	if (list == NULL || *list == NULL || data == NULL)
 		return 1;
-	rwl_readlock((*list)->head_lock);
-	node_t* current = (*list)->head;
+	linked_list_t* c_list = *list;
+	rwl_readlock((c_list)->head_lock);
+	node_t* current = (c_list)->head;
 	if (current == NULL) { // Empty list
-		rwl_readunlock((*list)->head_lock);
+		rwl_readunlock((c_list)->head_lock);
 		return 1;
 	}
 	rwl_readlock(current->np_lock);
-	rwl_readunlock((*list)->head_lock);
+	rwl_readunlock((c_list)->head_lock);
 	while (current != NULL) {
 		if (current->index == index) {
 			rwl_writelock(current->data_lock);
@@ -381,14 +387,15 @@ int list_node_compute(linked_list_t** list, int index,
 		void *(*compute_func)(void *), void** result) {
 	if (list == NULL || *list == NULL || compute_func == NULL || result == NULL)
 		return 1;
-	rwl_readlock((*list)->head_lock);
-	node_t* current = (*list)->head;
+	linked_list_t* c_list = *list;
+	rwl_readlock((c_list)->head_lock);
+	node_t* current = (c_list)->head;
 	if (current == NULL) { // Empty list
-		rwl_readunlock((*list)->head_lock);
+		rwl_readunlock((c_list)->head_lock);
 		return 1;
 	}
 	rwl_readlock(current->np_lock);
-	rwl_readunlock((*list)->head_lock);
+	rwl_readunlock((c_list)->head_lock);
 	while (current != NULL) {
 		if (current->index == index) {
 			rwl_readlock(current->data_lock);

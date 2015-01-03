@@ -193,6 +193,6 @@ int main ()
 	}
 
 	list_free (&list);
-
+	printf("PASS\n");
 	return EXIT_SUCCESS;
 }
