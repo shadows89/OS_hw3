@@ -49,7 +49,7 @@ void nodeInit(int index, void* data, node_t* node) {
 struct linked_list_t {
 	rwlock_t head_lock;
 	rwlock_t size_lock;
-	int delete;
+	int valid;
 	node_t* head;
 	int numberOfElements;
 };
@@ -119,7 +119,7 @@ linked_list_t** list_alloc() {
 			newList->size_lock = rwl_init();
 			newList->head = NULL;
 			newList->numberOfElements = 0;
-			newList->delete = 0;
+			newList->valid = 0;
 			*p_newList = newList;
 			return p_newList;
 		}
@@ -129,9 +129,9 @@ linked_list_t** list_alloc() {
 void list_free(linked_list_t*** list) {
 	if (list == NULL || *list == NULL || **list == NULL)
 		return;
-	if ((**list)->delete !=0 )
+	if ((**list)->valid !=0 )
 		return;
-	(**list)->delete = 1;
+	(**list)->valid = 1;
 	linked_list_t** c_list = *list;
 	*list = NULL;
 	rwl_writelock((*c_list)->head_lock);
@@ -154,6 +154,8 @@ void list_free(linked_list_t*** list) {
 
 int list_insert(linked_list_t** list, int index, void* data) {
 	if (list == NULL || *list == NULL)
+		return 1;
+	if ((*list)->valid !=0 )
 		return 1;
 	linked_list_t* c_list = *list;
 	rwl_writelock((c_list)->head_lock);
@@ -214,6 +216,8 @@ int list_insert(linked_list_t** list, int index, void* data) {
 
 int list_remove(linked_list_t** list, int index) {
 	if (list == NULL || *list == NULL)
+		return 1;
+	if ((*list)->valid !=0 )
 		return 1;
 	linked_list_t* c_list = *list;
 	rwl_writelock((c_list)->head_lock);
@@ -282,6 +286,8 @@ int list_remove(linked_list_t** list, int index) {
 int list_contains(linked_list_t** list, int index) {
 	if (list == NULL || *list == NULL)
 		return 0;
+	if ((*list)->valid !=0 )
+		return 0;
 	linked_list_t* c_list = *list;
 	rwl_readlock((c_list)->head_lock);
 	node_t* current = (c_list)->head;
@@ -310,6 +316,8 @@ int list_contains(linked_list_t** list, int index) {
 int list_size(linked_list_t** list) {
 	if (list == NULL || *list == NULL)
 		return -1;
+	if ((*list)->valid !=0 )
+		return -1;
 	linked_list_t* c_list = *list;
 	rwl_readlock((c_list)->head_lock);
 	int tmp_size = 0;
@@ -323,6 +331,8 @@ int list_size(linked_list_t** list) {
 void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
 	if (list == NULL || *list == NULL || ops == NULL)
 		return;
+	if ((*list)->valid !=0 )
+		return;
 	int i = 0;
 //	pthread_t* threads = malloc(sizeof(pthread_t) * num_ops);
 //	if (threads == NULL)
@@ -334,7 +344,7 @@ void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
 		args[i].op = ops + i;
 		switch ((ops[i]).op) {
 		case INSERT:
-			pthread_create(&threads[i], NULL, aux_list_insert, args + i);
+			pthread_create(&threads[i], NULL, aux_list_insert, args + i); // TODO if ( != 0) {return}
 			break;
 		case REMOVE:
 			pthread_create(&threads[i], NULL, aux_list_remove, args + i);
@@ -358,6 +368,8 @@ void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
 
 int list_update_node(linked_list_t** list, int index, void* data) {
 	if (list == NULL || *list == NULL || data == NULL)
+		return 1;
+	if ((*list)->valid !=0 )
 		return 1;
 	linked_list_t* c_list = *list;
 	rwl_readlock((c_list)->head_lock);
@@ -390,6 +402,8 @@ int list_update_node(linked_list_t** list, int index, void* data) {
 int list_node_compute(linked_list_t** list, int index,
 		void *(*compute_func)(void *), void** result) {
 	if (list == NULL || *list == NULL || compute_func == NULL || result == NULL)
+		return 1;
+	if ((*list)->valid !=0 )
 		return 1;
 	linked_list_t* c_list = *list;
 	rwl_readlock((c_list)->head_lock);
