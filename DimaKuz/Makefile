@@ -3,7 +3,7 @@ RANLIB=ranlib
 TARGET=main
 C_SOURCES=$(wildcard *.c)
 C_OBJS=$(C_SOURCES:.c=.o)
-CFLAGS=-I. -I. -Wall -Werror -g3 -O0 $(CFLAGS_EXTRA)
+CFLAGS=-I. -I. -Wall -g3 -O0 $(CFLAGS_EXTRA)
 LDFLAGS=-L. -lmylist -lpthread
 
 all: $(TARGET)

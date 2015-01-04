@@ -49,7 +49,7 @@ void nodeInit(int index, void* data, node_t* node) {
 struct linked_list_t {
 	rwlock_t head_lock;
 	rwlock_t size_lock;
-
+	int delete;
 	node_t* head;
 	int numberOfElements;
 };
@@ -119,6 +119,7 @@ linked_list_t** list_alloc() {
 			newList->size_lock = rwl_init();
 			newList->head = NULL;
 			newList->numberOfElements = 0;
+			newList->delete = 0;
 			*p_newList = newList;
 			return p_newList;
 		}
@@ -128,6 +129,9 @@ linked_list_t** list_alloc() {
 void list_free(linked_list_t*** list) {
 	if (list == NULL || *list == NULL || **list == NULL)
 		return;
+	if ((**list)->delete !=0 )
+		return;
+	(**list)->delete = 1;
 	linked_list_t** c_list = *list;
 	*list = NULL;
 	rwl_writelock((*c_list)->head_lock);
