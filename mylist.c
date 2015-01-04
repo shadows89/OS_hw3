@@ -344,19 +344,24 @@ void list_batch(linked_list_t** list, int num_ops, op_t* ops) {
 		args[i].op = ops + i;
 		switch ((ops[i]).op) {
 		case INSERT:
-			pthread_create(&threads[i], NULL, aux_list_insert, args + i); // TODO if ( != 0) {return}
+			if ((pthread_create(&threads[i], NULL, aux_list_insert, args + i)) != 0)
+				return; // TODO if ( != 0) {return}
 			break;
 		case REMOVE:
-			pthread_create(&threads[i], NULL, aux_list_remove, args + i);
+			if ((pthread_create(&threads[i], NULL, aux_list_remove, args + i)) != 0)
+				return;
 			break;
 		case CONTAINS:
-			pthread_create(&threads[i], NULL, aux_list_contains, args + i);
+			if ((pthread_create(&threads[i], NULL, aux_list_contains, args + i)) != 0)
+				return;
 			break;
 		case UPDATE:
-			pthread_create(&threads[i], NULL, aux_list_update_node, args + i);
+			if ((pthread_create(&threads[i], NULL, aux_list_update_node, args + i)) != 0)
+				return;
 			break;
 		case COMPUTE:
-			pthread_create(&threads[i], NULL, aux_list_node_compute, args + i);
+			if ((pthread_create(&threads[i], NULL, aux_list_node_compute, args + i)) != 0)
+				return;
 			break;
 		}
 	}
